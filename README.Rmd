@@ -1,0 +1,16 @@
+---
+title: "New Markdown file"
+author: "scarabel"
+date: "5 marraskuuta 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##Markdown documents
+This is a new Markdown document.
+My class diary is available at
+
+https://scarabel.github.io/IODS-project/
