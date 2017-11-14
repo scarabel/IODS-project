@@ -44,7 +44,8 @@ new_lrn14 <- filter(new_lrn14, Points>0)
 str(new_lrn14)
 
 # save table
+setwd("~/GitHub/IODS-project")
 write.csv(new_lrn14, file="learning2014")
 # read table (and make sure to print all the entries)
 options(max.print=2000)
-read.csv(new_lrn14)
+read.csv("learning2014")
