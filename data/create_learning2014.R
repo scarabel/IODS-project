@@ -43,9 +43,16 @@ new_lrn14 <- select(learning2014,columns)
 new_lrn14 <- filter(new_lrn14, Points>0)
 str(new_lrn14)
 
-# save table
+# rename columns coherently
+str(new_lrn14)
+colnames(new_lrn14)[2] <- "age"
+colnames(new_lrn14)[3] <- "attitude"
+colnames(new_lrn14)[7] <- "points"
+
+# choose working directory and save table
 setwd("~/GitHub/IODS-project")
 write.csv(new_lrn14, file="learning2014")
 # read table (and make sure to print all the entries)
 options(max.print=2000)
 read.csv("learning2014")
+
