@@ -1,0 +1,148 @@
+# Chapter 3: Logistic regression
+
+*Goal of this project is to explore a data set and perform and interpret the logistic regression analysis. The dataset 'alc' is obtained by the previous data wrangling exercise 3.*
+
+What I learnt:
+
+* to fit a regression model to categorical data
+* to make predictions from the model
+* to perform a K-fold cross validation of the model by studying the number of wrong preditions
+
+
+## The database
+The database I am going to study is obtained to approach students' achievement in secondary education of two Portuguese schools. The data attributes include student grades, demographic, social and school related features) and it was collected by using school reports and questionnaires. Two datasets are provided regarding the performance in two distinct subjects: Mathematics (mat) and Portuguese language (por). The original database is available [here](https://archive.ics.uci.edu/ml/datasets/Student+Performance).
+In the data wrangling exercise, we joined the data sets into the new dataset 'alc' by combining the two student alcohol consumption data sets. The following adjustments have been made: the variables not used for joining the two data have been combined by averaging (including the grade variables); 'alc_use' is the average of 'Dalc' and 'Walc'; 'high_use' is TRUE if 'alc_use' is higher than 2 and FALSE otherwise
+The final database 'alc' hase 382 entrie and 36 fields.
+
+I load the dataset 'alc' from the subfolder 'data' in the folder 'IODS-project', and I print out the fields' names.
+```{r}
+setwd("~/GitHub/IODS-project/data")
+alc <- read.csv("alc")
+colnames(alc)
+dim(alc)
+```
+
+I will investigate the relation betweek high alcohol consumption and the following variables:
+
+* famrel - quality of family relationships (numeric: from 1 - very bad to 5 - excellent) 
+* Medu, Fedu - mother/father's education (numeric: 0 - none, 1 - primary education (4th grade), 2 - 5th to 9th grade, 3 - secondary education, or 4 - higher education). I define a variable Pedu ("parents' education") containing the avarage of Medu and Fedu
+```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+library(dplyr)
+alc <- mutate(alc, Pedu = rowMeans(select(alc,c("Medu","Fedu"))))
+```
+* goout - going out with friends (numeric: from 1 - very low to 5 - very high) 
+* absences - number of school absences (numeric: from 0 to 93) 
+
+My hypothesis is that alcohol consumption may be positively correlated with low quality of family relationships orlow education level of the parents.
+I will also investigate if a alcohol consumption is a group phenomenon (students that often go out with friends), or is correlated with loneliness (students that do not go out often).
+Finally, I will investigate the correlation between alcohol consumption and absences from school.
+
+##Overview of the variables of interest
+I present here a brief overview of the variables selected for the analysis
+```{r}
+summary(alc$activities)
+summary(alc$famrel)
+summary(alc$Pedu)
+summary(alc$goout)
+summary(alc$absences)
+```
+
+Graphically, I explore how the selected variables are correlated with high alcohol consumption:
+```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+library(GGally)
+library(ggplot2)
+library(tidyr);
+```
+```{r eval=TRUE, echo=FALSE, fig.width=5, fig.height=3}
+alc_red <- select(alc,c("high_use","famrel","Pedu","goout","absences"))
+gather(alc_red) %>% ggplot(aes(value)) + facet_wrap("key", scales = "free") + geom_bar()
+```
+
+To explore the relations between the variables, I create a scattered plot of the different variables. 
+
+```{r eval=TRUE, echo=FALSE}
+p <- ggpairs(alc_red)
+p
+
+
+```
+
+From the plot, we can draw some first observations about the correlation between the variables:
+
+* worse family relations are correlated with higher alcohol consumption
+* going out with friends often is correlated with higher alcohol consumption.
+* higher alcohol consumption is correlated with higher number of absences from school
+* no significant correlation emerges with parents' education.
+
+## Logistic regression
+I define a regression model for the four exaplanatory variables.
+I print the summary of the regression model and the coefficients.
+
+```{r eval=TRUE, echo=FALSE}
+m <- glm(high_use ~ famrel + Pedu + goout + absences, data = alc_red, family = "binomial")
+summary(m)
+coef(m)
+```
+The exponential function of the coefficients of the model gives us the odds ratios of the variables.
+Therefore, I can obtain the odds ratios and their confidence intervals by taking the exponential function:
+```{r message=FALSE, warning=FALSE}
+OR <- coef(m) %>% exp
+CI <- confint(m) %>% exp
+cbind(OR, CI)
+```
+
+From the summary of our model, by looking at the p-value we notice that only 'famrel', 'goout' and 'absences' are significant to explain 'high_use' (p-value less than 0.05), while 'Pedu' is not significant.
+This is clear also from the odds ratios and their confidence intervals: the confidence intervals for the variable 'Pedu' contains the value 1 for the odd ratio, meaning that, given the value of 'Pedu', we predict high or low alcohol consumption with the same probability. In practice, 'Pedu' does not help in predicting the alcohol consumption of an individual.
+
+Hence, we define another model by keeping only the significant three variables.
+```{r message=FALSE, warning=FALSE}
+m2 <- glm(high_use ~ famrel + goout + absences, data = alc_red, family = "binomial")
+summary(m2)
+OR <- coef(m2) %>% exp
+CI <- confint(m2) %>% exp
+cbind(OR, CI)
+```
+
+## Predictive power of the model
+I now use the model 'm2' to make predictions about alcohol consumption. I define a new field in the dataset 'alc_red' with a logical value if the predicted probability of high consumption is higher than 0.5.
+
+```{r eval=TRUE}
+predictions <- predict(m2, type = "response")
+alc_red <- mutate(alc_red, predictions = predictions>0.5)
+table(high_use=alc_red$high_use,prediction=alc_red$predictions)
+```
+
+I count the proportion of wrong predictions (inaccurately classified individuals) from the dataset:
+```{r}
+wrong <- abs(alc_red$high_use-alc_red$predictions)>0.5
+mean(wrong)
+```
+
+Slightly less than 1 over 4 predictions is wrong. 
+Random guessing would give a proportion of wrong predictions of about 0.5.
+This means that the model 'm2' predicts the correct status if the individual (high/low alcohol consumption) in 3 cases out of 4.
+I think the predictive power is quite good.
+
+## Cross validation
+To understand more deeply the predictive power of the model, I perform the cross validation.
+In particular, in the 10-fold cross validation, the dataset is divided into 10 subsets, and each time nine subsets are used for training, (i.e., estimating the coefficients of the regression model), and the last one is used for assessing the predictive power of the model.
+
+```{r}
+library(boot)
+loss_func <- function(class, prob) {
+  n_wrong <- abs(class - prob) > 0.5
+  mean(n_wrong)
+}
+cv <- cv.glm(data=alc_red, cost=loss_func, glmfit=m2, K=10)
+cv$delta[1]
+```
+
+I notice that model 'm2' has better performance (i.e., smaller prediction error using 10-fold cross-validation) than the DataCamp model, which has about 0.26 error.
+The new model suggests that alcohol consumption should be studied as group phenomenon, because of the high correlation with the habit of going out with group of friends.
+
+
+
+
+
+
+
