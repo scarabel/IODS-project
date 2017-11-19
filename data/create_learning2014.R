@@ -1,4 +1,4 @@
-## Francesca Scarabel, 15.11.2018
+## Francesca Scarabel, 15.11.2017
 # script create_learning2014
 #  
 # the meaning of the combined variable is available at the webpage
