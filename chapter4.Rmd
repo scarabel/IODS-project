@@ -1,0 +1,233 @@
+# Chapter 4: Clustering and classification
+
+*Goal of this project is to explore Boston dataset about Housing values in suburbs of Boston.*
+
+What I learnt:
+
+* to divide a dataset into train and test subsets
+* to convert a continuous variable into a categorical variable
+* to use linear discriminant analysis (LDA) for expressing one dependent variable as a linear combination of some explanatory variables
+* k-means method to identify clusters in the data
+* to measure the distance between clusters and identify the optimal number of clusters
+
+
+## The dataset
+The database we analyse this week is the 'Boston' database, one of the databases available in R, in the 'MASS' library.
+The database has the following structure:
+```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+library(MASS)
+library(dplyr)
+library(tidyverse)
+data("Boston")
+str(Boston)
+
+```
+The dataset has 14 different fields and 506 observations, regarding housing values in the suburbs of Boston.
+Further information available [here](https://stat.ethz.ch/R-manual/R-devel/library/MASS/html/Boston.html).
+Here are the summaries of the variables:
+
+```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+summary(Boston)
+library("ggplot2")
+panel.hist <- function(x, ...)
+{
+    usr <- par("usr"); on.exit(par(usr))
+    par(usr = c(usr[1:2], 0, 1.5) )
+    h <- hist(x, plot = FALSE)
+    breaks <- h$breaks; nB <- length(breaks)
+    y <- h$counts; y <- y/max(y)
+    rect(breaks[-nB], 0, breaks[-1], y, col = "cyan", ...)
+}
+panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
+{
+    usr <- par("usr"); on.exit(par(usr))
+    par(usr = c(0, 1, 0, 1))
+    r <- abs(cor(x, y))
+    txt <- format(c(r, 0.123456789), digits = digits)[1]
+    txt <- paste0(prefix, txt)
+    if(missing(cex.cor)) cex.cor <- 0.8/strwidth(txt)
+    text(0.5, 0.5, txt, cex = cex.cor * r)
+}
+
+#pairs(Boston, diag.panel=panel.hist, upper.panel=panel.cor)
+```
+
+To understand the correlation between variables, a graphical representation of the value of correlation is useful:
+```{r eval=TRUE, echo=FALSE,  message=FALSE, warning=FALSE}
+library(corrplot)
+cor_matrix<-cor(Boston) %>% round(digits=2)
+corrplot(cor_matrix, method="circle", type="upper", cl.pos="b", tl.pos="d", tl.cex=0.6)
+```
+
+The two variables 'tax' (index of accessibility to radial highways) and 'rad' (full-value property-tax rate per $10,000) seem to have highest correlation with 'crim' (per capita crime rate by town), so I present a graphical overview of these variables and their correlation.
+```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+selected <- c(1,9,10)
+pairs(Boston[selected], diag.panel=panel.hist, upper.panel=panel.cor)
+#summary(Boston$crim)
+#summary(Boston$tax)
+#summary(Boston$rad)
+```
+
+Notice the special distribution of 'tax' and 'rad', which are not Gaussian distributed, but present a number of observation which is isolated far to the right of the distribution.
+Notice once again the high correlation of 'tax' and 'rad' with 'crim'.
+
+##Standardization and train/test division
+For the following analysis, I standardize the variables in the dataset.
+The function 'scale' does this action
+From the summary of the standardized data, observe that all variables have now mean zero.
+```{r echo=FALSE}
+boston_scaled <- scale(Boston)
+boston_scaled <- as.data.frame(boston_scaled)
+summary(boston_scaled)
+```
+
+Then, I transform the continuous variable 'crim' into a categorical variable by using its quatiles, and I add a new categorical variable 'crime' to the 'boston_scaled' dataset.
+```{r echo=FALSE}
+bins <- quantile(boston_scaled$crim)
+crime <- cut(boston_scaled$crim, breaks = bins, include.lowest = TRUE, label=c("low","med_low","med_high","high"))
+
+boston_scaled <- dplyr::select(boston_scaled, -crim)
+boston_scaled <- data.frame(boston_scaled, crime)
+```
+```{r}
+summary(boston_scaled$crime)
+```
+
+I now divide the dataset 'boston_scaled' into a train set containing a 80% of the original rows (404 randomly chosen rows) and a test set, containing the remaining 20% of the rows (i.e., 102 rows).
+
+```{r eval=TRUE, echo=FALSE}
+# Divide the dataset into train and test subsets:
+n <- nrow(boston_scaled)
+
+# choose randomly 80% of the rows
+ind <- sample(n,  size = n * 0.8)
+
+# create train set
+train <- boston_scaled[ind,]
+
+# create test set 
+test <- boston_scaled[-ind,]
+```
+```{r eval=TRUE}
+str(train)
+```
+```{r eval=TRUE}
+str(test)
+```
+
+## Linear Discriminant Analysis
+Fit the linear discriminant analysis on the train set. Use the categorical crime rate as the target variable and all the other variables in the dataset as predictor variables. Draw the LDA (bi)plot.
+
+```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+lda.fit <- lda(crime ~ ., data = train)
+# the function for lda biplot a~ .rrows
+lda.arrows <- function(x, myscale = 1, arrow_heads = 0.1, color = "red", tex = 0.75, choices = c(1,2)){
+  heads <- coef(x)
+  arrows(x0 = 0, y0 = 0, 
+         x1 = myscale * heads[,choices[1]], 
+         y1 = myscale * heads[,choices[2]], col=color, length = arrow_heads)
+  text(myscale * heads[,choices], labels = row.names(heads), 
+       cex = tex, col=color, pos=3)
+}
+
+# target classes as numeric
+classes <- as.numeric(train$crime)
+
+# plot the lda results
+plot(lda.fit, dimen = 2, col=classes, pch=classes)
+lda.arrows(lda.fit, myscale = 2)
+```
+
+From the size of the arrows, we understand that 'rad', 'nox' (nitrogen oxides concentration, parts per 10 million) and 'zn' (proportion of residential land zoned for lots over 25,000 sq.ft) have the highest correlation on 'crime'.
+
+## Prediction on the test subset
+Save the crime categories from the test set and then remove the categorical crime variable from the test dataset. Then predict the classes with the LDA model on the test data. Cross tabulate the results with the crime categories from the test set. 
+
+```{r eval=TRUE, echo=FALSE, fig.width=5, fig.height=3}
+correct_classes <- test$crime
+test <- dplyr::select(test, -crime)
+lda.pred <- predict(lda.fit, newdata = test)
+table(correct = correct_classes, predicted = lda.pred$class)
+```
+From the cross table, we observe that about 65-70% of the predictions are correct. The remaining 30-35% have been uncorrectly classified. (The percentage varies alightly according to how the subsets train and test are randomly selected)
+
+## Distance measure
+I calculate the distances between the observations in the standardized dataset 'boston_scaled', and I run the k-means algorithm with 3 clusters.
+```{r eval=TRUE}
+data(Boston)
+boston_scaled <- scale(Boston)
+euc_dist <- dist(boston_scaled)
+km <-kmeans(boston_scaled, centers = 3)
+```
+
+To investigate what is the optimal number of clusters, I study the total within cluster sum of squares (WSCC) for an increasing number of clusters 1,...5.
+```{r eval=TRUE, echo=FALSE}
+twcss <- sapply(1:20, function(k){kmeans(boston_scaled, k)$tot.withinss})
+qplot(x = 1:20, y = twcss, geom = 'line')
+```
+
+I notice that a relevant drop happens for a number of clusters equal to 2. I run the k-means algorithm with 2 clusters.
+```{r eval=TRUE}
+km <-kmeans(boston_scaled, centers = 2)
+pairs(boston_scaled, col = km$cluster)
+```
+
+Because of the high number of variables, to simplify the visualization I again restrict to the variables 'tax' and 'rad'.
+With 2 clusters, we obtain the following.
+```{r eval=TRUE}
+km <-kmeans(boston_scaled, centers = 2)
+pairs(boston_scaled[,selected], col = km$cluster)
+```
+
+## LDA on clusters
+
+I perform k-means on the standardized dataset with an increased number of cluster equal to 7.
+```{r eval=TRUE}
+# scale variables and set as data frame class
+boston_scaled <- scale(boston_scaled)
+boston_scaled <- as.data.frame(boston_scaled)
+
+# k-means on 7 clusters
+km <-kmeans(boston_scaled, centers = 7)
+cluster <- km$cluster
+boston_scaled <- data.frame(boston_scaled,cluster)
+
+# divide train and test datasets
+ind <- sample(n,  size = n * 0.8)
+train <- boston_scaled[ind,]
+test <- boston_scaled[-ind,]
+```
+
+Perform LDA using the clusters as target classes. Include all the variables in the Boston data in the LDA model. Visualize the results with a biplot (include arrows representing the relationships of the original variables to the LDA solution).
+
+```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+lda.fit <- lda(cluster ~ ., data = train)
+# the function for lda biplot a~ .rrows
+lda.arrows <- function(x, myscale = 1, arrow_heads = 0.1, color = "red", tex = 0.75, choices = c(1,2)){
+  heads <- coef(x)
+  arrows(x0 = 0, y0 = 0, 
+         x1 = myscale * heads[,choices[1]], 
+         y1 = myscale * heads[,choices[2]], col=color, length = arrow_heads)
+  text(myscale * heads[,choices], labels = row.names(heads), 
+       cex = tex, col=color, pos=3)
+}
+
+# target classes as numeric
+classes <- as.numeric(train$cluster)
+
+# plot the lda results
+plot(lda.fit, dimen = 2, col=classes+2, pch=classes)
+lda.arrows(lda.fit, myscale = 2)
+```
+
+The most influencial separators seem to be 'tax', 'rad, 'zn'.
+
+I now study how the model predict the classes, on the test subset formed by 102 observations: notice that good predictive power of the model.
+
+
+```{r eval=TRUE, echo=FALSE, fig.width=5, fig.height=3}
+correct_classes <- test$cluster
+test <- dplyr::select(test, -cluster)
+lda.pred <- predict(lda.fit, newdata = test)
+table(correct = correct_classes %>% round(digits=2), predicted = lda.pred$class %>% as.numeric %>% round(digits=2))
+```
