@@ -39,8 +39,49 @@ str(gii)
 human <- inner_join(hd, gii, by = "country")
 str(human)
 
-# save table
-setwd("~/GitHub/IODS-project/data")
-write.csv(human, file="human")
+## save table
+# setwd("~/GitHub/IODS-project/data")
+# write.csv(human, file="human")
 # read table
-read.csv("human")
+# human <- read.csv("human")
+
+## second part:
+library(tidyr)
+library(stringr)
+library(dplyr)
+
+# mutate the gni column as numeric
+
+human$gni <- str_replace(human$gni, pattern=",", replace ="") %>% as.numeric
+str(human$gni)
+
+# keep only the relevant columns. With the names I am using, these are
+keep <- c("country","edu_ratio","lab_ratio","mean_school","exp_life","gni","mat_mort","ado_birth","parl")
+
+human <- dplyr::select(human,one_of(keep))
+
+# I rename the columns for coherency with the DataCamp exercise,
+# descriptions are available in the metafile
+# https://raw.githubusercontent.com/TuomoNieminen/Helsinki-Open-Data-Science/master/datasets/human_meta.txt
+
+colnames(human) <- c("Country", "Edu2.FM", "Labo.FM", "Edu.Exp", "Life.Exp", "GNI", "Mat.Mor", "Ado.Birth", "Parli.F")
+
+# delete rows with missing values
+human <- filter(human,complete.cases(human))
+str(human)
+
+# remove data that relates to regions instead of countries
+tail(human$Country, n=10)
+human <- human[1:(nrow(human)-7),]
+
+# Define the row names of the data by the country names 
+# and remove the country name column from the data.
+rownames(human) <- human$Country
+human <- select(human,-Country)
+dim(human)
+
+## save table
+setwd("~/GitHub/IODS-project/data")
+write.csv(human, file="human", row.names = TRUE)
+# read table
+human2 <- read.csv("human", row.names=TRUE)
