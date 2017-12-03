@@ -1,0 +1,118 @@
+# Chapter 5: Dimensionality reduction techniques
+
+*Goal of this project is to study the human dataset and practice dimensionality reduction.*
+
+What I learnt:
+
+* (in the data wrangling exercise) to select only data observations that are complete (no NA values)
+* to reduce large dimension (many variables) of the problem via PCA and interpret the biplot
+* for categorical variables, to reduce the dimension via MCA and interpret the numerical and graphical outputs
+
+## The dataset
+The database we analyse this week is the 'human' database from the United Nations Development Programme.
+The database has the following structure:
+```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(GGally)
+library(corrplot)
+human <- read.table("http://s3.amazonaws.com/assets.datacamp.com/production/course_2218/datasets/human2.txt", sep  =",", header = T)
+str(human)
+
+```
+The dataset has 8 variables and 155 observations, regarding the Human Development Index (HDI) and several variables summarising key aspects connected to it.
+Further information available [here](http://hdr.undp.org/en/content/human-development-index-hdi).
+For simplicity I renamed the variables according to the instructions in the exercise.
+Here are the descriptions of the variables names:
+
+* "Edu2.FM" = Edu2.F / Edu2.M
+* "Labo.FM" = Labo2.F / Labo2.M
+* "Edu.Exp" = Expected years of schooling 
+* "Life.Exp" = Life expectancy at birth
+* "GNI" = Gross National Income per capita
+* "Mat.Mor" = Maternal mortality ratio
+* "Parli.F" = Percentage of female representatives in parliament
+
+## Overview of the variables
+A summary of the variables and their correlation:
+```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+summary(human)
+ggpairs(human)
+cor(human) %>% corrplot()
+```
+
+From the graphical correlation matrix it emerges that many variables are highly correlated with each other. 
+This suggests that a reduction of dimensionality is interesting, because some of the variables, being highly correlated with osme others, may not help in giving additional insight into the data.
+Hence we resort to PCA (Principal Component Analysis).
+
+## PCA on the non-standardized dataset
+I consider the *non standardized* dataset and perform the Principal Component Analysis (PCA).
+The summary of the PCA, together with a biplot, follows.
+
+```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.cap="Figure 1: Biplot of PC on non-standardized 'human': the PCA is not useful to reduce the components because the variance of the GNI dominates by some orders of magnitude."}
+pca_human <- prcomp(human)
+summary(pca_human)
+biplot(pca_human, choices = 1:2, cex=c(0.5,1))
+```
+
+It is evident that almost all the variance is captured by the principal component, which is aligned with the variable GNI.
+This is because the variance of the variable GNI is itself on a completely different scale compared to the other variables.
+Indeed, notice the large difference between standard deviations of the principal components:
+```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+pca_human$sdev
+```
+
+## PCA on the standardized dataset
+I now consider the standardized dataset.
+```{r eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+human_std <- scale(human)
+summary(human_std)
+```
+
+Next, I perform the PCA and present a biplot for the standardized dataset.
+```{r eval=TRUE, echo=FALSE, warning=FALSE, fig.cap="Figure 2: Biplot of PC on standardized 'human': most of the variables are correlated with each other and with the first principal component (capturing more than 50% of the variation), while the number of women in parliament and the ratio between women and men in the labor force are strongly correlated with each other and with PC2 (capturing almost another 20% of the variation)."}
+pca_human_std <- prcomp(human_std)
+summary(pca_human_std)
+biplot(pca_human_std, choices = 1:2, cex=c(0.5,0.8), col=c("grey40","red"))
+```
+
+After standardization, the variance of different variables can be compared and their contribution to the total variance are of the same order of magnitude.
+The two first PC capture almost 70% of the cumulative variance.
+
+## Interpretation of PCA
+From the biplot, we observe that most of the variables are aligned with one of the two axis, so all the variables are higly correlated with either PC1 or PC2.
+The two variables 'labo.FM' and 'Parli' are strongly correlated with the PC2, while all the other variables are correlated with the PC1.
+Since the two PC captures almost 70% of the variance, they may be sufficient to get sgnificant insight on the data.
+
+## Multiple Correspondence Analysis (MCA)
+Consider the 'tea' dataset from the library 'FactoMineR'.
+```{r eval=TRUE, echo=TRUE, warning=FALSE}
+library(FactoMineR)
+data("tea")
+dim(tea)
+str(tea)
+```
+
+The dataset contains 300 observations of 36 variables regarding tea consumption.
+
+For the following analysis, I choose only a limited subset of variables to simplify the analysis.
+I consider only the variables
+"frequency","How","Sport","effect.on.health","sex","home","exciting","relaxing".
+
+```{r eval=TRUE, echo=FALSE, warning=FALSE}
+keep_tea <- c("frequency","How","Sport","effect.on.health","sex","home","exciting","relaxing")
+tea_red <- dplyr::select(tea,one_of(keep_tea))
+summary(tea_red)
+```
+
+I perform the MCA analysis on the reduced dataset:
+```{r eval=TRUE, echo=FALSE, warning=FALSE}
+mca <- MCA(tea_red, graph=TRUE)
+summary(mca)
+#plot(mca, invisible=c("ind"), habillage="quali")
+```
+
+From the plot of the categories in the two dimensions we understand that 'frequency' is the most correlated with the first dimension, summarizing 13% of the variance.
+The second dimension, which captures about 11%, is mostly correlated with the variables 'Sport' and 'How'.
+This is confirm by the last table of the MCA, summarising the relations between categorical variables and dimensions:  'exciting', 'relaxing' and 'frequency' have high values for the first dimension (0.386, 0.332, 0.310 respectively), while 'Sport' and 'How' have high values for the second dimension (0.441 and 0.230 respectively).
