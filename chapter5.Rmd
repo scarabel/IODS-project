@@ -43,7 +43,7 @@ cor(human) %>% corrplot()
 ```
 
 From the graphical correlation matrix it emerges that many variables are highly correlated with each other. 
-This suggests that a reduction of dimensionality is interesting, because some of the variables, being highly correlated with osme others, may not help in giving additional insight into the data.
+This suggests that a reduction of dimensionality is interesting, because some of the variables, being highly correlated with some others, may not help in giving additional insight into the data.
 Hence we resort to PCA (Principal Component Analysis).
 
 ## PCA on the non-standardized dataset
@@ -98,7 +98,7 @@ The dataset contains 300 observations of 36 variables regarding tea consumption.
 
 For the following analysis, I choose only a limited subset of variables to simplify the analysis.
 I consider only the variables
-"frequency","How","Sport","effect.on.health","sex","home","exciting","relaxing".
+'frequency', 'How', 'Sport', 'effect.on.health', 'sex', 'home', 'exciting', 'relaxing'.
 
 ```{r eval=TRUE, echo=FALSE, warning=FALSE}
 keep_tea <- c("frequency","How","Sport","effect.on.health","sex","home","exciting","relaxing")
@@ -106,12 +106,14 @@ tea_red <- dplyr::select(tea,one_of(keep_tea))
 summary(tea_red)
 ```
 
+
 I perform the MCA analysis on the reduced dataset:
 ```{r eval=TRUE, echo=FALSE, warning=FALSE}
 mca <- MCA(tea_red, graph=TRUE)
 summary(mca)
 #plot(mca, invisible=c("ind"), habillage="quali")
 ```
+
 
 From the plot of the categories in the two dimensions we understand that 'frequency' is the most correlated with the first dimension, summarizing 13% of the variance.
 The second dimension, which captures about 11%, is mostly correlated with the variables 'Sport' and 'How'.
